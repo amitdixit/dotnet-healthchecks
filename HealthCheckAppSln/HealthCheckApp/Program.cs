@@ -2,6 +2,7 @@ using HealthCheckApp.HealthChecks;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Models;
 using Models.DataAccess;
 
@@ -9,10 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 // Add services to the container.
 
-builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database")
-        .AddSqlServer(config.GetConnectionString("StudentAppContext"))
-        .AddCheck<HttpApiHealthCheck>("HttpApi");
+
 
 builder.Services.AddHttpClient();
 builder.Services.AddControllers();
@@ -26,6 +24,17 @@ builder.Services.AddDbContext<StudentAppContext>(options =>
 {
     options.UseSqlServer(config.GetConnectionString("StudentAppContext"));
 });
+
+builder.Services.AddHealthChecks()
+        .AddCheck<DatabaseHealthCheck>("Database")
+        .AddSqlServer(config.GetConnectionString("StudentAppContext"))
+        .AddCheck<HttpApiHealthCheck>("HttpApi")
+        .AddDbContextCheck<StudentAppContext>();
+
+builder.Services.AddHealthChecksUI(options =>
+{
+    options.AddHealthCheckEndpoint("Health API", "/_healthcheck");
+}).AddInMemoryStorage();
 
 var app = builder.Build();
 
@@ -56,11 +65,20 @@ app.UseHttpsRedirection();
 
 app.MapHealthChecks("/_health", options: new HealthCheckOptions
 {
-    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse,
+    ResultStatusCodes = {
+        [HealthStatus.Healthy]= StatusCodes.Status200OK,
+        [HealthStatus.Degraded]= StatusCodes.Status200OK,
+        [HealthStatus.Unhealthy]= StatusCodes.Status503ServiceUnavailable
+    }
 });
 
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecksUI(options =>
+{
+    options.UIPath = "/_healthDashboard";
+});
 
 app.Run();

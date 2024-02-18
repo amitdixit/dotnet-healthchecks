@@ -23,6 +23,14 @@ public class HttpApiHealthCheck : IHealthCheck
             if (resp.StatusCode != System.Net.HttpStatusCode.OK)
                 return HealthCheckResult.Unhealthy();
 
+            //OR
+
+            if (resp.IsSuccessStatusCode)
+            {
+                return await Task.FromResult(new HealthCheckResult(status: HealthStatus.Healthy, description: "API is Up"));
+            }
+
+
             return HealthCheckResult.Healthy();
 
         }
